@@ -1,77 +1,179 @@
 <!DOCTYPE html>
 <html lang="uz">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>3D Ludo</title>
-  <style>
-    body {
-      margin: 0;
-      background: #152238;
-      color: white;
-      font-family: Arial, sans-serif;
-      text-align: center;
-    }
-    h1 { color: #ffd54f; }
-    #board {
-      display: grid;
-      grid-template-columns: repeat(15, 1fr);
-      width: min(94vw, 480px);
-      aspect-ratio: 1;
-      margin: 16px auto;
-      background: white;
-      border: 4px solid #263238;
-      box-sizing: border-box;
-    }
-    .cell {
-      border: 1px solid #d8dce3;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: clamp(8px, 2.5vw, 15px);
-      color: #222;
-    }
-    .red { background: #ff5252; }
-    .green { background: #4caf50; }
-    .yellow { background: #ffeb3b; }
-    .blue { background: #42a5f5; }
-    .home { background: #fff; }
-    button {
-      padding: 13px 25px;
-      border: 0;
-      border-radius: 12px;
-      background: #ffd54f;
-      font-size: 17px;
-      font-weight: bold;
-    }
-    #result { font-size: 22px; margin: 12px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D Ludo</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101827;color:white;font-family:Arial;text-align:center}
+h2{color:#ffd54f;margin:14px}
+#game{width:100%;max-width:600px;margin:auto}
+canvas{display:block;width:100%;height:auto;touch-action:pan-y}
+button{padding:12px 24px;border:0;border-radius:12px;background:#ffd54f;font-size:18px;font-weight:bold}
+#status{padding:12px;font-size:18px}
+</style>
 </head>
 <body>
-  <h1>🎲 3D Ludo</h1>
-  <p>Bizning Ludo loyihamiz!</p>
-  <div id="board"></div>
-  <div id="result">Zarni tashlang!</div>
-  <button onclick="rollDice()">🎲 Zar tashlash</button>
-  <script>
-    const board = document.getElementById('board');
-    for (let r = 0; r < 15; r++) {
-      for (let c = 0; c < 15; c++) {
-        const cell = document.createElement('div');
-        cell.className = 'cell';
-        if (r < 6 && c < 6) cell.classList.add('red');
-        else if (r < 6 && c > 8) cell.classList.add('green');
-        else if (r > 8 && c < 6) cell.classList.add('blue');
-        else if (r > 8 && c > 8) cell.classList.add('yellow');
-        else cell.classList.add('home');
-        board.appendChild(cell);
-      }
-    }
-    function rollDice() {
-      const n = Math.floor(Math.random() * 6) + 1;
-      document.getElementById('result').textContent =
-        '🎲 Zar: ' + n;
-    }
-  </script>
+<h2>🎲 3D LUDO</h2>
+<div id="game"></div>
+<div id="status">Zarni tashlang!</div>
+<button id="roll">🎲 Zar tashlash</button>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
+
+const root=document.getElementById('game');
+const scene=new THREE.Scene();
+scene.background=new THREE.Color('#101827');
+scene.add(new THREE.HemisphereLight(0xffffff,0x667788,2));
+
+const camera=new THREE.PerspectiveCamera(38,1,0.1,100);
+camera.position.set(0,15,17);
+camera.lookAt(0,0,0);
+
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+root.appendChild(renderer.domElement);
+
+const light=new THREE.DirectionalLight(0xffffff,3);
+light.position.set(-5,12,8);
+light.castShadow=true;
+scene.add(light);
+
+const mat=(color,roughness=.3,metalness=.05)=>
+ new THREE.MeshStandardMaterial({color,roughness,metalness});
+
+const colors=['#ef3340','#27b85a','#f5d52e','#2389ff'];
+const tileMats=colors.map(c=>mat(c));
+const white=mat('#ffffff');
+const dark=mat('#273449');
+const board=new THREE.Group();
+scene.add(board);
+
+function block(w,h,d,material,x,y,z){
+ const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);
+ mesh.position.set(x,y,z);
+ mesh.castShadow=true;
+ mesh.receiveShadow=true;
+ board.add(mesh);
+ return mesh;
+}
+
+// Ko'tarilgan kvadrat taxta
+block(13,.5,13,dark,0,-.3,0);
+block(12.8,.12,12.8,mat('#f8f5e9'),0,0,0);
+
+// To'rtta rangli uy
+const homes=[
+ [-3.15,-3.15], [3.15,-3.15],
+ [-3.15,3.15], [3.15,3.15]
+];
+homes.forEach(([x,z],i)=>{
+ block(5,.16,5,tileMats[i],x,.12,z);
+ block(3.6,.1,3.6,white,x,.23,z);
+ for(let j=0;j<4;j++){
+  const a=(j%2)*1.4-.7;
+  const b=(Math.floor(j/2))*1.4-.7;
+  const pawn=new THREE.Mesh(
+   new THREE.CylinderGeometry(.32,.4,.65,32),
+   mat(colors[i],.2,.15)
+  );
+  pawn.position.set(x+a,.65,z+b);
+  pawn.castShadow=true;
+  board.add(pawn);
+  const top=new THREE.Mesh(
+   new THREE.SphereGeometry(.31,32,24),
+   mat(colors[i],.18,.15)
+  );
+  top.position.set(x+a,1.08,z+b);
+  top.castShadow=true;
+  board.add(top);
+ }
+});
+
+// Markazdagi rangli yo'llar
+for(let i=0;i<6;i++){
+ for(let j=0;j<3;j++){
+  block(.64,.13,.64,tileMats[j===0?0:j===1?1:2],
+   -1.3+i*.52,.14,-.85+j*.55);
+ }
+}
+block(1.8,.18,1.8,mat('#ffffff'),0,.2,0);
+
+// 3D zar
+const dice=new THREE.Group();
+scene.add(dice);
+dice.position.set(0,1.35,0);
+const cube=new THREE.Mesh(
+ new THREE.BoxGeometry(1.05,1.05,1.05),
+ mat('#ffffff',.24)
+);
+cube.castShadow=true;
+dice.add(cube);
+
+const dotMat=mat('#182235');
+const faces=[
+ {p:[0,0,.531],r:[0,0,0]},
+ {p:[0,0,-.531],r:[0,Math.PI,0]},
+ {p:[.531,0,0],r:[0,Math.PI/2,0]},
+ {p:[-.531,0,0],r:[0,-Math.PI/2,0]},
+ {p:[0,.531,0],r:[-Math.PI/2,0,0]},
+ {p:[0,-.531,0],r:[Math.PI/2,0,0]}
+];
+const layouts={
+ 1:[[0,0]],2:[[-.2,-.2],[.2,.2]],
+ 3:[[-.22,-.22],[0,0],[.22,.22]],
+ 4:[[-.22,-.22],[.22,-.22],[-.22,.22],[.22,.22]],
+ 5:[[-.22,-.22],[.22,-.22],[0,0],[-.22,.22],[.22,.22]],
+ 6:[[-.22,-.25],[.22,-.25],[-.22,0],[.22,0],[-.22,.25],[.22,.25]]
+};
+function addDots(n,face){
+ layouts[n].forEach(([u,v])=>{
+  const dot=new THREE.Mesh(new THREE.SphereGeometry(.065,16,12),dotMat);
+  dot.position.set(...face.p);
+  if(Math.abs(face.p[2])>.5) dot.position.set(u,v,face.p[2]);
+  else if(Math.abs(face.p[0])>.5) dot.position.set(face.p[0],v,u);
+  else dot.position.set(u,face.p[1],v);
+  dot.rotation.set(...face.r);
+  dice.add(dot);
+ });
+}
+function showDice(n){
+ while(dice.children.length>1)dice.remove(dice.children[1]);
+ const orientation=[
+  [0,0,0],[0,Math.PI/2,0],[0,0,0],
+  [0,-Math.PI/2,0],[-Math.PI/2,0,0],[Math.PI/2,0,0]
+ ][n-1];
+ dice.rotation.set(...orientation);
+ addDots(n,faces[0]);
+}
+showDice(1);
+
+function resize(){
+ const w=Math.min(root.clientWidth,600);
+ renderer.setSize(w,w,false);
+ camera.aspect=1;
+ camera.updateProjectionMatrix();
+}
+window.addEventListener('resize',resize);
+resize();
+
+document.getElementById('roll').addEventListener('click',()=>{
+ const n=Math.floor(Math.random()*6)+1;
+ showDice(n);
+ dice.rotation.x+=Math.random()*2;
+ dice.rotation.y+=Math.random()*2;
+ document.getElementById('status').textContent='🎲 Zar: '+n;
+});
+
+function animate(){
+ requestAnimationFrame(animate);
+ board.rotation.y=Math.sin(Date.now()*.0003)*.025;
+ renderer.render(scene,camera);
+}
+animate();
+</script>
 </body>
 </html>
